@@ -1,0 +1,72 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
+"""scaffold: add the verify + feature-map skill pair to a repo.
+
+  scaffold --repo ~/code/acme --name acme --title "Acme" --cli acmectl [--codex]
+
+Writes <repo>/.claude/skills/verify-<name>/SKILL.md and
+<repo>/.claude/skills/<name>-feature-map/{SKILL.md,render-map,features/}.
+Refuses to overwrite existing files. --codex also symlinks both into
+<repo>/.agents/skills/ so Codex sees them.
+"""
+import argparse
+import re
+import stat
+import sys
+from pathlib import Path
+
+KIT = Path(__file__).resolve().parent.parent
+T = KIT / "templates"
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--repo", required=True, type=Path)
+    ap.add_argument("--name", required=True, help="lowercase slug, e.g. acme")
+    ap.add_argument("--title", required=True, help="human name, e.g. Acme")
+    ap.add_argument("--cli", required=True, help="verify CLI command name, e.g. acmectl")
+    ap.add_argument("--codex", action="store_true", help="also symlink into .agents/skills")
+    a = ap.parse_args()
+    if not re.fullmatch(r"[a-z][a-z0-9-]*", a.name):
+        sys.exit("--name must be a lowercase slug")
+    repo = a.repo.expanduser().resolve()
+    if not (repo / ".git").exists():
+        sys.exit(f"{repo} is not a git repo root")
+    subs = {"{{NAME}}": a.name, "{{TITLE}}": a.title, "{{CLI}}": a.cli,
+            "{{VERIFY_SKILL}}": f"verify-{a.name}", "{{MAP_SKILL}}": f"{a.name}-feature-map",
+            "{{ENVPREFIX}}": re.sub(r"\W", "_", a.name).upper()}
+    skills = repo / ".claude" / "skills"
+    plan = []
+    for src_dir, dest in ((T / "verify", skills / subs["{{VERIFY_SKILL}}"]), (T / "feature-map", skills / subs["{{MAP_SKILL}}"])):
+        for src in sorted(src_dir.rglob("*")):
+            if src.is_file():
+                plan.append((src, dest / src.relative_to(src_dir)))
+    clash = [d for _, d in plan if d.exists()]
+    if clash:
+        sys.exit("refusing to overwrite:\n  " + "\n  ".join(map(str, clash)))
+    for src, dest in plan:
+        text = src.read_text()
+        for k, v in subs.items():
+            text = text.replace(k, v)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(text)
+        if src.stat().st_mode & stat.S_IXUSR:
+            dest.chmod(dest.stat().st_mode | 0o111)
+        print(f"wrote {dest.relative_to(repo)}")
+    if a.codex:
+        agents = repo / ".agents" / "skills"
+        agents.mkdir(parents=True, exist_ok=True)
+        for s in (subs["{{VERIFY_SKILL}}"], subs["{{MAP_SKILL}}"]):
+            link = agents / s
+            if not link.exists() and not link.is_symlink():
+                link.symlink_to(Path("..") / ".." / ".claude" / "skills" / s)
+                print(f"linked {link.relative_to(repo)}")
+    print(f"\nNext: write {a.cli} (see {KIT}/references/cli-contract.md), fill the <!-- --> blanks, add area files.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
