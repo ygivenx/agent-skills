@@ -7,6 +7,7 @@ My personal agent skills (Claude Code and Codex). One folder per skill under `sk
 | skill | what it does |
 |---|---|
 | [`explain-diff`](skills/explain-diff/SKILL.md) | Produces a rich, interactive single-file HTML explanation (background, intuition, code walkthrough, quiz) of a diff, branch, or PR. |
+| [`review-spec-page`](skills/review-spec-page/SKILL.md) | Renders a markdown spec as an offline, reviewable HTML page: Keep/Change/Question per decision, assumption and gap, Markdown export, optional explorers. Requires [`uv`](https://docs.astral.sh/uv/). |
 | [`project-verify-kit`](skills/project-verify-kit/SKILL.md) | Scaffolds a verify CLI skill + graded feature-map skill into any repo. Requires [`uv`](https://docs.astral.sh/uv/). |
 
 ## Install
