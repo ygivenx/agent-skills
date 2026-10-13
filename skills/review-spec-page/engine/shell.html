@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+{{CSS}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="pill draft">{{STATUS}}</span>
+    <p class="title">{{TITLE}}</p>
+    <p class="prov">{{PROVENANCE}}</p>
+  </div>
+  <div class="tools">
+    <div class="search" role="search">
+      <input id="q" type="search" placeholder="Search the spec" aria-label="Search the spec" autocomplete="off">
+      <kbd aria-hidden="true">/</kbd>
+      <span id="qcount" class="qcount" aria-live="polite"></span>
+      <button id="qprev" type="button" class="icon" aria-label="Previous match" disabled>&uarr;</button>
+      <button id="qnext" type="button" class="icon" aria-label="Next match" disabled>&darr;</button>
+    </div>
+    <button id="toggleAll" type="button">Collapse all</button>
+    <button id="openReview" type="button" class="primary" aria-expanded="false" aria-controls="review">
+      Review <span id="reviewBadge" class="badge">0</span>
+    </button>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="toc" aria-label="Contents">
+    <p class="toc-head">Contents</p>
+    <ol id="toc"></ol>
+    <p class="toc-foot">Click a section heading to fold it. Hover a <span class="xref-demo">§ link</span> to peek at it.</p>
+  </nav>
+  <main id="main">
+{{WIDGETS}}
+    <article id="spec" class="spec">
+{{SPEC}}
+    </article>
+  </main>
+</div>
+
+<aside id="review" class="drawer" aria-labelledby="reviewTitle" hidden>
+  <div class="drawer-head">
+    <h2 id="reviewTitle">Your review</h2>
+    <button id="closeReview" type="button" class="icon" aria-label="Close review">&times;</button>
+  </div>
+  <p class="muted">Mark each decision, assumption and gap as Keep, Change or Question, and add a note where it
+    helps. It is saved in this browser only. When you're done, copy it as Markdown and paste it into the chat.</p>
+  <div id="reviewStats" class="stats"></div>
+  <div class="drawer-actions">
+    <button id="copyReview" type="button" class="primary">Copy as Markdown</button>
+    <button id="downloadReview" type="button">Download .md</button>
+    <button id="resetReview" type="button" class="danger">Reset</button>
+  </div>
+  <div class="filter" role="group" aria-label="Show">
+    <button type="button" data-show="all" aria-pressed="true">All</button>
+    <button type="button" data-show="open" aria-pressed="false">Not reviewed</button>
+    <button type="button" data-show="change" aria-pressed="false">Change</button>
+    <button type="button" data-show="ask" aria-pressed="false">Question</button>
+  </div>
+  <ol id="reviewList" class="review-list"></ol>
+</aside>
+
+<div id="peek" class="peek" role="tooltip" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script>
+window.SPEC_CONFIG = {{CONFIG}};
+{{JS}}
+</script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["markdown-it-py"]
+# ///
+"""Render a markdown spec as one self-contained, reviewable HTML page.
+
+    bin/render SPEC.md [--extras DIR] [--envs DEV,TEST,PROD] [--status TEXT] [--out FILE] [--open]
+
+The markdown stays the source of truth: this reads it and writes SPEC.html beside it
+(or --out). Re-run after every edit. No network is needed to view the page.
+
+--extras DIR  optional folder with widgets.html (markup placed above the spec) and
+              widgets*.js (sorted, concatenated; one sets window.SpecPage.extras). Defaults to SPEC's sibling
+              folder `spec-page/` when it exists.
+"""
+
+from __future__ import annotations
+
+import argparse
+import html
+import json
+import re
+import subprocess
+import sys
+from datetime import date
+from pathlib import Path
+
+from markdown_it import MarkdownIt
+
+ENGINE = Path(__file__).resolve().parent.parent / "engine"
+JS_ORDER = ("core.js", "review.js")
+
+
+def git(cwd: Path, *args: str) -> str:
+    try:
+        return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True,
+                              check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return ""
+
+
+def provenance(spec: Path) -> str:
+    """Which revision the page shows, so a stale page is visibly stale."""
+    sha = git(spec.parent, "log", "-1", "--format=%h", "--", str(spec)) or "uncommitted"
+    dirty = git(spec.parent, "status", "--porcelain", "--", str(spec))
+    return f"spec @ {sha}{' + uncommitted edits' if dirty else ''} · rendered {date.today()}"
+
+
+def read(path: Path) -> str:
+    return path.read_text(encoding="utf-8") if path.exists() else ""
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("spec", type=Path)
+    ap.add_argument("--extras", type=Path)
+    ap.add_argument("--envs", default="", help="comma-separated checklist columns, e.g. DEV,TEST,PROD")
+    ap.add_argument("--status", default="Draft · unreviewed")
+    ap.add_argument("--out", type=Path)
+    ap.add_argument("--open", action="store_true")
+    a = ap.parse_args()
+
+    spec = a.spec.resolve()
+    extras = (a.extras or spec.parent / "spec-page")
+    text = spec.read_text(encoding="utf-8")
+    md = MarkdownIt("commonmark", {"html": False}).enable("table")
+    title = next((ln.lstrip("# ").strip() for ln in text.splitlines() if ln.startswith("#")), spec.stem)
+    config = {"envs": [e.strip() for e in a.envs.split(",") if e.strip()]}
+    slots = {
+        "TITLE": html.escape(title),
+        "STATUS": html.escape(a.status),
+        "PROVENANCE": html.escape(provenance(spec)),
+        "CSS": read(ENGINE / "page.css"),
+        "WIDGETS": read(extras / "widgets.html"),
+        "SPEC": md.render(text),
+        "CONFIG": json.dumps(config).replace("</", "<\\/"),
+        "JS": "\n".join([read(ENGINE / f) for f in JS_ORDER] + [*[read(f) for f in sorted(extras.glob("widgets*.js"))], read(ENGINE / "boot.js")]),
+    }
+    # One pass, so text inside the spec can never be taken for a slot.
+    page = re.sub(r"\{\{([A-Z]+)\}\}", lambda m: slots[m.group(1)], read(ENGINE / "shell.html"))
+    out = (a.out or spec.with_suffix(".html")).resolve()
+    out.write_text(page, encoding="utf-8")
+    print(f"wrote {out}")
+    if a.open:
+        subprocess.run(["open", str(out)], check=False)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
